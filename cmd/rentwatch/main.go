@@ -4,14 +4,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/axonigma/rent-watcher/internal/app"
 	"github.com/axonigma/rent-watcher/internal/config"
+	"github.com/axonigma/rent-watcher/internal/logging"
 	"github.com/axonigma/rent-watcher/internal/version"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -24,19 +25,23 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		log.Fatal().Err(err).Msg("load config")
 	}
-	log.Printf("rent-watcher version=%s", version.String)
+	logging.Configure(cfg.Debug)
+	log.Info().
+		Str("version", version.String).
+		Bool("debug", cfg.Debug).
+		Msg("starting rent-watcher")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	a, err := app.New(ctx, cfg)
 	if err != nil {
-		log.Fatalf("create app: %v", err)
+		log.Fatal().Err(err).Msg("create app")
 	}
 
 	if err := a.Run(ctx); err != nil {
-		log.Fatalf("run app: %v", err)
+		log.Fatal().Err(err).Msg("run app")
 	}
 }

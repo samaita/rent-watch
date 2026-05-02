@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/axonigma/rent-watcher/internal/model"
 	"github.com/axonigma/rent-watcher/internal/notifier"
 	"github.com/axonigma/rent-watcher/internal/store"
+	"github.com/rs/zerolog/log"
 )
 
 type Scheduler struct {
@@ -53,12 +53,12 @@ func (s *Scheduler) runSingleCycle(ctx context.Context) {
 	now := time.Now()
 	cycle, err := s.store.GetOrCreateRunningCycle(ctx, now)
 	if err != nil {
-		log.Printf("get or create cycle: %v", err)
+		log.Error().Err(err).Msg("get or create cycle")
 		return
 	}
 	watches, err := s.store.PendingWatchPagesForCycle(ctx, cycle.ID)
 	if err != nil {
-		log.Printf("pending watch pages: %v", err)
+		log.Error().Err(err).Int64("cycle_id", cycle.ID).Msg("pending watch pages")
 		return
 	}
 	if len(watches) == 0 {
@@ -74,7 +74,7 @@ func (s *Scheduler) runSingleCycle(ctx context.Context) {
 			Timeout:  s.cfg.ScrapeTimeout,
 		})
 		if err != nil {
-			log.Printf("build extractor %s: %v", siteKey, err)
+			log.Error().Err(err).Str("site_key", siteKey).Msg("build extractor")
 			continue
 		}
 		s.runSiteGroup(ctx, cycle.ID, ext, siteWatches)
@@ -97,13 +97,25 @@ func (s *Scheduler) runSiteGroup(ctx context.Context, cycleID int64, ext extract
 		finishedAt := time.Now()
 		if err != nil {
 			if recErr := s.store.RecordFailedRun(ctx, cycleID, watch, startedAt, finishedAt, err.Error()); recErr != nil {
-				log.Printf("record failed run: %v", recErr)
+				log.Error().
+					Err(recErr).
+					Int64("cycle_id", cycleID).
+					Int64("watch_page_id", watch.ID).
+					Str("site_key", watch.SiteKey).
+					Str("url", watch.URL).
+					Msg("record failed run")
 			}
 			continue
 		}
 		events, err := s.store.RecordSuccessfulRun(ctx, cycleID, watch, startedAt, finishedAt, listings)
 		if err != nil {
-			log.Printf("record successful run: %v", err)
+			log.Error().
+				Err(err).
+				Int64("cycle_id", cycleID).
+				Int64("watch_page_id", watch.ID).
+				Str("site_key", watch.SiteKey).
+				Str("url", watch.URL).
+				Msg("record successful run")
 			continue
 		}
 		s.notifyEvents(ctx, events)
@@ -113,7 +125,7 @@ func (s *Scheduler) runSiteGroup(ctx context.Context, cycleID int64, ext extract
 func (s *Scheduler) finalizeCycle(ctx context.Context, cycleID int64) {
 	events, finalized, err := s.store.FinalizeCycleIfComplete(ctx, cycleID, time.Now())
 	if err != nil {
-		log.Printf("finalize cycle: %v", err)
+		log.Error().Err(err).Int64("cycle_id", cycleID).Msg("finalize cycle")
 		return
 	}
 	if finalized {
@@ -124,7 +136,11 @@ func (s *Scheduler) finalizeCycle(ctx context.Context, cycleID int64) {
 func (s *Scheduler) notifyEvents(ctx context.Context, events []model.ListingEvent) {
 	for _, event := range events {
 		if err := s.notifier.Send(ctx, notifier.FormatEvent(event)); err != nil {
-			log.Printf("notify event: %v", err)
+			log.Error().
+				Err(err).
+				Str("event_type", string(event.EventType)).
+				Str("listing_url", event.ListingURL).
+				Msg("notify event")
 		}
 	}
 }
@@ -139,11 +155,11 @@ func (s *Scheduler) runHeartbeat(ctx context.Context) {
 		case <-ticker.C:
 			status, err := s.store.HeartbeatStatus(ctx)
 			if err != nil {
-				log.Printf("heartbeat status: %v", err)
+				log.Error().Err(err).Msg("heartbeat status")
 				continue
 			}
 			if err := s.notifier.Send(ctx, notifier.FormatHeartbeat(status)); err != nil {
-				log.Printf("send heartbeat: %v", err)
+				log.Error().Err(err).Msg("send heartbeat")
 			}
 		}
 	}

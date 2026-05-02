@@ -3,12 +3,12 @@ package notifier
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/rs/zerolog/log"
 
 	"github.com/axonigma/rent-watcher/internal/model"
 	"github.com/axonigma/rent-watcher/internal/version"
@@ -38,14 +38,24 @@ func NewTelegram(token string, allowedUserIDs []int64) (*Telegram, error) {
 	for _, id := range allowedUserIDs {
 		allowedMap[id] = true
 	}
+	log.Info().
+		Str("bot_username", bot.Self.UserName).
+		Int64("bot_id", bot.Self.ID).
+		Int("allowed_user_count", len(allowedMap)).
+		Msg("telegram bot authenticated")
 	return &Telegram{bot: bot, allowedUsers: allowedMap}, nil
 }
 
 func (t *Telegram) Send(ctx context.Context, text string) error {
+	if len(t.allowedUsers) == 0 {
+		log.Warn().Msg("telegram notification skipped: no allowed user ids configured")
+		return nil
+	}
 	for userID := range t.allowedUsers {
 		// For direct bot conversations, the private chat ID matches the user ID.
 		chatID := userID
 		msg := tgbotapi.NewMessage(chatID, text)
+		log.Debug().Int64("chat_id", chatID).Msg("sending telegram notification")
 		if _, err := t.bot.Send(msg); err != nil {
 			return err
 		}
@@ -56,28 +66,60 @@ func (t *Telegram) Send(ctx context.Context, text string) error {
 func (t *Telegram) Start(ctx context.Context, commands CommandHandler) error {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
+	log.Info().
+		Str("bot_username", t.bot.Self.UserName).
+		Int("timeout_seconds", u.Timeout).
+		Int("allowed_user_count", len(t.allowedUsers)).
+		Msg("starting telegram long polling")
 	updates := t.bot.GetUpdatesChan(u)
+	log.Info().
+		Str("bot_username", t.bot.Self.UserName).
+		Msg("telegram long polling active")
 	for {
 		select {
 		case <-ctx.Done():
+			log.Info().Msg("telegram listener stopping")
 			return nil
 		case update, ok := <-updates:
 			if !ok {
+				log.Warn().Msg("telegram updates channel closed")
 				return nil
 			}
 			if update.Message == nil {
+				log.Debug().Int("update_id", update.UpdateID).Msg("ignoring telegram update without message")
 				continue
 			}
 			fields := strings.Fields(update.Message.Text)
 			if len(fields) == 0 {
+				log.Debug().
+					Int("update_id", update.UpdateID).
+					Int64("chat_id", update.Message.Chat.ID).
+					Msg("ignoring telegram message without text command")
 				continue
 			}
 			if update.Message.From == nil {
+				log.Warn().
+					Int("update_id", update.UpdateID).
+					Int64("chat_id", update.Message.Chat.ID).
+					Str("text", update.Message.Text).
+					Msg("ignoring telegram message without sender")
 				continue
 			}
 			chatID := update.Message.Chat.ID
 			userID := update.Message.From.ID
+			log.Info().
+				Int("update_id", update.UpdateID).
+				Int64("chat_id", chatID).
+				Int64("user_id", userID).
+				Str("username", update.Message.From.UserName).
+				Str("chat_type", update.Message.Chat.Type).
+				Str("text", update.Message.Text).
+				Msg("incoming telegram chat")
 			if len(t.allowedUsers) > 0 && !t.allowedUsers[userID] {
+				log.Warn().
+					Int64("chat_id", chatID).
+					Int64("user_id", userID).
+					Msg("ignoring telegram message from unauthorized user")
 				continue
 			}
 			var text string
@@ -92,11 +134,21 @@ func (t *Telegram) Start(ctx context.Context, commands CommandHandler) error {
 					text = resp
 				}
 			default:
+				log.Debug().
+					Int64("chat_id", chatID).
+					Int64("user_id", userID).
+					Str("command", fields[0]).
+					Msg("ignoring unsupported telegram command")
 				continue
 			}
 			msg := tgbotapi.NewMessage(chatID, text)
+			log.Info().
+				Int64("chat_id", chatID).
+				Int64("user_id", userID).
+				Str("command", fields[0]).
+				Msg("sending telegram command response")
 			if _, err := t.bot.Send(msg); err != nil {
-				log.Printf("telegram send command response: %v", err)
+				log.Error().Err(err).Int64("chat_id", chatID).Msg("telegram send command response")
 			}
 		}
 	}

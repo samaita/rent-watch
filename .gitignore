@@ -40,4 +40,4 @@ coverage/
 Thumbs.db
 .idea/
 .vscode/
-
+seed.yaml

@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/axonigma/rent-watcher/internal/config"
@@ -11,6 +10,7 @@ import (
 	"github.com/axonigma/rent-watcher/internal/seed"
 	"github.com/axonigma/rent-watcher/internal/service"
 	"github.com/axonigma/rent-watcher/internal/store"
+	"github.com/rs/zerolog/log"
 )
 
 type App struct {
@@ -48,12 +48,17 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 
 	var n notifier.Notifier = notifier.Noop{}
 	if cfg.TelegramBotToken != "" {
+		log.Info().
+			Int("allowed_user_count", len(cfg.TelegramUserIDs)).
+			Msg("telegram integration enabled")
 		tg, err := notifier.NewTelegram(cfg.TelegramBotToken, cfg.TelegramUserIDs)
 		if err != nil {
 			st.Close()
 			return nil, err
 		}
 		n = tg
+	} else {
+		log.Info().Msg("telegram integration disabled: TELEGRAM_BOT_TOKEN not set")
 	}
 	svc := service.New(st)
 	return &App{
@@ -68,6 +73,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 func (a *App) Run(ctx context.Context) error {
 	defer a.store.Close()
 	a.scheduler.Run(ctx)
+	log.Info().Msg("scheduler started")
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -78,7 +84,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		log.Printf("shutting down")
+		log.Info().Msg("shutting down")
 		return nil
 	case err := <-errCh:
 		return err

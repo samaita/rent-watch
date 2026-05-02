@@ -1,8 +1,11 @@
 package config
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +16,7 @@ type Config struct {
 	SeedPath         string
 	TelegramBotToken string
 	TelegramUserIDs  []int64
+	Debug            bool
 	Timezone         string
 	CycleInterval    time.Duration
 	HeartbeatEvery   time.Duration
@@ -24,11 +28,16 @@ type Config struct {
 }
 
 func Load() (Config, error) {
+	if err := loadLocalDotEnv(); err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		SQLitePath:       getenv("SQLITE_PATH", "rent-watcher.sqlite"),
 		SeedPath:         os.Getenv("SEED_PATH"),
 		TelegramBotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
 		TelegramUserIDs:  parseInt64List(os.Getenv("TELEGRAM_ALLOWED_USER_IDS")),
+		Debug:            mustBool("DEBUG", false),
 		Timezone:         getenv("TIMEZONE", "Asia/Jakarta"),
 		CycleInterval:    mustDuration("CYCLE_INTERVAL", "12h"),
 		HeartbeatEvery:   mustDuration("HEARTBEAT_INTERVAL", "1h"),
@@ -45,6 +54,53 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("SAME_SITE_MAX_DELAY must be >= SAME_SITE_MIN_DELAY")
 	}
 	return cfg, nil
+}
+
+func loadLocalDotEnv() error {
+	path := filepath.Join(".", ".env")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for lineNo := 1; scanner.Scan(); lineNo++ {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		if strings.HasPrefix(line, "export ") {
+			line = strings.TrimSpace(strings.TrimPrefix(line, "export "))
+		}
+
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			return fmt.Errorf("parse %s:%d: missing '='", path, lineNo)
+		}
+
+		key = strings.TrimSpace(key)
+		if key == "" {
+			return fmt.Errorf("parse %s:%d: empty key", path, lineNo)
+		}
+		if _, exists := os.LookupEnv(key); exists {
+			continue
+		}
+
+		value = strings.TrimSpace(value)
+		value = strings.Trim(value, `"'`)
+		if err := os.Setenv(key, value); err != nil {
+			return fmt.Errorf("set %s from %s: %w", key, path, err)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scan %s: %w", path, err)
+	}
+	return nil
 }
 
 func getenv(key, fallback string) string {

@@ -35,7 +35,12 @@ cp .env.example .env
 cp seed.example.yaml seed.yaml
 ```
 
-3. Export the variables before running the app:
+3. The app now loads configuration in two steps:
+
+- first from the machine environment
+- then from a local `.env` in the repo root for any variables that are still unset
+
+You can still export variables explicitly when needed:
 
 ```bash
 set -a
@@ -48,7 +53,7 @@ set +a
 Run the watcher:
 
 ```bash
-go run ./cmd/rentwatch
+make dev
 ```
 
 Print the version:
@@ -63,11 +68,10 @@ Run tests:
 go test ./...
 ```
 
-Build a local binary:
+Build a local binary in the repo root:
 
 ```bash
-mkdir -p bin
-go build -o bin/rentwatch ./cmd/rentwatch
+make build
 ```
 
 ## Environment Variables
@@ -76,6 +80,7 @@ go build -o bin/rentwatch ./cmd/rentwatch
 | --- | --- | --- |
 | `SQLITE_PATH` | No | Path to the SQLite database file. Default: `rent-watcher.sqlite`. |
 | `SEED_PATH` | Yes | Path to the YAML seed file containing watch pages. |
+| `DEBUG` | No | Enables debug-level logging when set to `true`. Default: `false`. |
 | `TELEGRAM_BOT_TOKEN` | No | Telegram bot token used for notifications and commands. |
 | `TELEGRAM_ALLOWED_USER_IDS` | No | Comma-separated list of Telegram user IDs allowed to receive notifications and run commands. In direct chats with the bot, the user ID is also the chat ID used for notifications. |
 | `TIMEZONE` | No | Application timezone. Default: `Asia/Jakarta`. |
@@ -97,6 +102,8 @@ When `TELEGRAM_BOT_TOKEN` is set, the bot supports:
 
 - `/version` to show the current app version
 - `/list` to list the tracked watches
+
+Startup logs now show whether Telegram was disabled, whether bot authentication succeeded, and when long polling becomes active. Incoming non-command messages and unsupported commands are ignored by design.
 
 ## Security Notes
 
