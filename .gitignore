@@ -1,0 +1,43 @@
+# Documentation drafts
+*.md
+!README.md
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.env
+*.local
+*.secret
+*.secrets
+secrets.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Database and runtime state
+*.sqlite
+*.sqlite3
+*.db
+*.log
+*.out
+tmp/
+.tmp/
+
+# Build artifacts
+bin/
+dist/
+build/
+coverage/
+*.test
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+

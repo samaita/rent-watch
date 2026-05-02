@@ -1,0 +1,7 @@
+watches:
+  - site_key: olx
+    url: https://www.olx.co.id/godean_g5000437/disewakan-rumah-apartemen_c5160/q--rumah-
+    enabled: true
+  - site_key: olx
+    url: https://www.olx.co.id/gamping_g5000436/disewakan-rumah-apartemen_c5160/q--rumah-
+    enabled: true
