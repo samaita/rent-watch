@@ -25,24 +25,26 @@ type CommandHandler interface {
 }
 
 type Telegram struct {
-	bot     *tgbotapi.BotAPI
-	allowed map[int64]bool
+	bot          *tgbotapi.BotAPI
+	allowedUsers map[int64]bool
 }
 
-func NewTelegram(token string, allowed []int64) (*Telegram, error) {
+func NewTelegram(token string, allowedUserIDs []int64) (*Telegram, error) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, err
 	}
-	allowedMap := make(map[int64]bool, len(allowed))
-	for _, id := range allowed {
+	allowedMap := make(map[int64]bool, len(allowedUserIDs))
+	for _, id := range allowedUserIDs {
 		allowedMap[id] = true
 	}
-	return &Telegram{bot: bot, allowed: allowedMap}, nil
+	return &Telegram{bot: bot, allowedUsers: allowedMap}, nil
 }
 
 func (t *Telegram) Send(ctx context.Context, text string) error {
-	for chatID := range t.allowed {
+	for userID := range t.allowedUsers {
+		// For direct bot conversations, the private chat ID matches the user ID.
+		chatID := userID
 		msg := tgbotapi.NewMessage(chatID, text)
 		if _, err := t.bot.Send(msg); err != nil {
 			return err
@@ -70,8 +72,12 @@ func (t *Telegram) Start(ctx context.Context, commands CommandHandler) error {
 			if len(fields) == 0 {
 				continue
 			}
+			if update.Message.From == nil {
+				continue
+			}
 			chatID := update.Message.Chat.ID
-			if len(t.allowed) > 0 && !t.allowed[chatID] {
+			userID := update.Message.From.ID
+			if len(t.allowedUsers) > 0 && !t.allowedUsers[userID] {
 				continue
 			}
 			var text string

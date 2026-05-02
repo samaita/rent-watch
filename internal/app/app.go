@@ -48,7 +48,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 
 	var n notifier.Notifier = notifier.Noop{}
 	if cfg.TelegramBotToken != "" {
-		tg, err := notifier.NewTelegram(cfg.TelegramBotToken, cfg.TelegramAllowed)
+		tg, err := notifier.NewTelegram(cfg.TelegramBotToken, cfg.TelegramUserIDs)
 		if err != nil {
 			st.Close()
 			return nil, err

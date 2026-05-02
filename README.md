@@ -19,7 +19,7 @@ Run a small watcher that:
 
 - Go `1.26.2`
 - A Chrome or Chromium binary available locally
-- Optional: a Telegram bot token and allowed chat IDs for notifications
+- Optional: a Telegram bot token and allowed user IDs for notifications
 
 ## Setup
 
@@ -77,7 +77,7 @@ go build -o bin/rentwatch ./cmd/rentwatch
 | `SQLITE_PATH` | No | Path to the SQLite database file. Default: `rent-watcher.sqlite`. |
 | `SEED_PATH` | Yes | Path to the YAML seed file containing watch pages. |
 | `TELEGRAM_BOT_TOKEN` | No | Telegram bot token used for notifications and commands. |
-| `TELEGRAM_ALLOWED_CHAT_IDS` | No | Comma-separated list of Telegram chat IDs allowed to receive notifications and run commands. |
+| `TELEGRAM_ALLOWED_USER_IDS` | No | Comma-separated list of Telegram user IDs allowed to receive notifications and run commands. In direct chats with the bot, the user ID is also the chat ID used for notifications. |
 | `TIMEZONE` | No | Application timezone. Default: `Asia/Jakarta`. |
 | `CYCLE_INTERVAL` | No | How often a full scraping cycle runs. Default: `12h`. |
 | `HEARTBEAT_INTERVAL` | No | How often heartbeat notifications are sent. Default: `1h`. |
@@ -101,6 +101,5 @@ When `TELEGRAM_BOT_TOKEN` is set, the bot supports:
 ## Security Notes
 
 - `.env`, private key material, local databases, and common secret file patterns are ignored by `.gitignore`.
-- Keep real bot tokens and chat IDs in `.env`, not in committed files.
+- Keep real bot tokens and Telegram user IDs in `.env`, not in committed files.
 - Commit `.env.example`, not `.env`.
-

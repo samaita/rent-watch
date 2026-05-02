@@ -12,7 +12,7 @@ type Config struct {
 	SQLitePath       string
 	SeedPath         string
 	TelegramBotToken string
-	TelegramAllowed  []int64
+	TelegramUserIDs  []int64
 	Timezone         string
 	CycleInterval    time.Duration
 	HeartbeatEvery   time.Duration
@@ -28,7 +28,7 @@ func Load() (Config, error) {
 		SQLitePath:       getenv("SQLITE_PATH", "rent-watcher.sqlite"),
 		SeedPath:         os.Getenv("SEED_PATH"),
 		TelegramBotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
-		TelegramAllowed:  parseInt64List(os.Getenv("TELEGRAM_ALLOWED_CHAT_IDS")),
+		TelegramUserIDs:  parseInt64List(os.Getenv("TELEGRAM_ALLOWED_USER_IDS")),
 		Timezone:         getenv("TIMEZONE", "Asia/Jakarta"),
 		CycleInterval:    mustDuration("CYCLE_INTERVAL", "12h"),
 		HeartbeatEvery:   mustDuration("HEARTBEAT_INTERVAL", "1h"),
